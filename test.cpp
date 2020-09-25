@@ -106,6 +106,39 @@ private:
     char info_log_vertex[512];
 };
 
+class Shader_program {
+public:
+    
+    void create_program() {
+		shader_program = glCreateProgram();
+	}
+
+    void attach_shader(int shader) {
+        glAttachShader(shader_program, shader);
+    }
+
+    void link_program() {
+        glLinkProgram(shader_program);
+
+        glGetProgramiv(shader_program, GL_LINK_STATUS, &success_program);
+
+        if (!success_program) {
+            glGetProgramInfoLog(shader_program, 512, nullptr, info_log_program);
+            std::cout << "ERROR::SHADER::PROGRAM::COMPILATION_FAILED\n" << info_log_program << std::endl;
+        }
+    }
+
+
+    int get_shader_program() {
+        return shader_program;
+    }
+    
+private:
+    int shader_program;
+    int success_program;
+    char info_log_program[512];
+};
+
 class GLInit {
 public:
     void framebuffer_size_callback(GLFWwindow* window, int width, int height) {};
@@ -169,6 +202,7 @@ int main()
     GLInit *init = new GLInit;
     Vertex_shader *vertex_shader = new Vertex_shader;
     Fragment_shader *fragment_shader = new Fragment_shader;
+    Shader_program *shader_program = new Shader_program;
 
     init->start();
     init->set_version(4, 0);
@@ -180,6 +214,11 @@ int main()
     
     fragment_shader->set_shader_source("fragment.fs");
     fragment_shader->compile_shader();
+
+    shader_program->create_program();
+    shader_program->attach_shader(vertex_shader->get_vertex_shader());
+    shader_program->attach_shader(fragment_shader->get_fragment_shader());
+    shader_program->link_program();
     
     float vertices[] = {
         -0.3f, -0.9f, 0.0f, 1.0f, 0.0f, 0.0f,
@@ -187,14 +226,8 @@ int main()
         0.0f,  0.3f, 0.0f, 0.0f, 0.0f, 1.0f
     };
 
-    float vertices2[] = {
-        0.3f, 0.9f, 0.0f,
-        -0.5f, 0.2f, 0.0f,
-        0.0f,  -0.3f, 0.0f
-    };
 
-
-    unsigned int VBO, VAO, VBO2, VAO2;
+    unsigned int VBO, VAO;
     glGenBuffers(1, &VBO);
     glBindBuffer(GL_ARRAY_BUFFER, VBO);
     glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
@@ -208,38 +241,6 @@ int main()
     glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(float) * 6, (void*)(sizeof(float) * 3))  ;
     glEnableVertexAttribArray(1);
 
-    glGenBuffers(1, &VBO2);
-    glBindBuffer(GL_ARRAY_BUFFER, VBO2);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices2), vertices2, GL_STATIC_DRAW);
-
-    glGenVertexArrays(1, &VAO2);
-    glBindVertexArray(VAO2);
-
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(float) * 3, (void*)0);
-    glEnableVertexAttribArray(0);
-
-    
-
-    int success_program;
-	char info_log_program[512];
-
-    unsigned int shader_program;
-    shader_program = glCreateProgram();
-
-    glAttachShader(shader_program, vertex_shader->get_vertex_shader());
-    glAttachShader(shader_program, fragment_shader->get_fragment_shader());
-
-    glLinkProgram(shader_program);
-
-    glGetProgramiv(shader_program, GL_LINK_STATUS, &success_program);
-
-    if (!success_program) {
-        glGetProgramInfoLog(shader_program, 512, nullptr, info_log_program);
-        std::cout << "ERROR::SHADER::PROGRAM::COMPILATION_FAILED\n" << info_log_program << std::endl;
-    }
-
-
-    
 
     while (!glfwWindowShouldClose(init->get_current_window())) {
         init->close_current_window('F');
@@ -247,10 +248,9 @@ int main()
         glClearColor(0, 0, 0.5f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT);
 
-        glUseProgram(shader_program);
+        glUseProgram(shader_program->get_shader_program());
         glBindVertexArray(VAO);
         glDrawArrays(GL_TRIANGLES, 0, 3);
-
 
         glfwSwapBuffers(init->get_current_window());
         glfwPollEvents();
