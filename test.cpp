@@ -8,8 +8,13 @@
 
 class Shader {
 public:
-    std::string load_shader(const char* path) { 
-       
+    Shader(int external_shader_type) : shader_type{ external_shader_type }
+    {
+
+    }
+
+    std::string load_shader(const char* path) {
+
         std::ifstream shader_file;
         std::string out_string;
 
@@ -33,85 +38,46 @@ public:
 
         return out_string;
     }
-    
-    virtual int compile_shader() = 0;
-};
 
-class Fragment_shader : Shader {
-public:
     void set_shader_source(const char* path) {
-		fragment_shader_source = load_shader(path);
-	}
-
-    int compile_shader() {
-		
-		fragment_shader = glCreateShader(GL_FRAGMENT_SHADER);
-		const char* temp_source = fragment_shader_source.c_str();
-		glShaderSource(fragment_shader, 1, &temp_source, nullptr);
-		glCompileShader(fragment_shader);
-
-		glGetShaderiv(fragment_shader, GL_COMPILE_STATUS, &success_fragment);
-
-		if (!success_fragment) {
-			glGetShaderInfoLog(fragment_shader, 512, nullptr, info_log_fragment);
-			std::cout << "ERROR::SHADER::FRAGMENT::COMPILATION_FAILED\n" << info_log_fragment << std::endl;
-		}
-		
-		return 0;
+        shader_source = load_shader(path);
     }
 
-    int get_fragment_shader() {
-        return fragment_shader;
-    }
-    
-private:
-	std::string fragment_shader_source;
-    int fragment_shader;
-    int success_fragment;
-    char info_log_fragment[512];
-};
-
-class Vertex_shader : Shader {
-public:
-    
-    void set_shader_source(const char* path) {
-		vertex_shader_source = load_shader(path);
-	}
-
     int compile_shader() {
-        vertex_shader = glCreateShader(GL_VERTEX_SHADER);
-        const char* temp_source = vertex_shader_source.c_str();
-        glShaderSource(vertex_shader, 1, &temp_source, nullptr);
-        glCompileShader(vertex_shader);
-
-        glGetShaderiv(vertex_shader, GL_COMPILE_STATUS, &success_vertex);
+        shader = glCreateShader(shader_type);
         
-        if (!success_vertex) {
-            glGetShaderInfoLog(vertex_shader, 512, nullptr, info_log_vertex);
-            std::cout << "ERROR::SHADER::VERTEX::COMPILATION_FAILED\n" << info_log_vertex << std::endl;
+        const char* temp_source = shader_source.c_str();
+        glShaderSource(shader, 1, &temp_source, nullptr);
+        glCompileShader(shader);
+
+        glGetShaderiv(shader, GL_COMPILE_STATUS, &success_fragment);
+
+        if (!success_fragment) {
+            glGetShaderInfoLog(shader, 512, nullptr, info_log_fragment);
+            std::cout << "ERROR::SHADER::COMPILATION_FAILED\n" << info_log_fragment << std::endl;
             return -1;
         }
 
         return 0;
     }
 
-    int get_vertex_shader() {
-        return vertex_shader;
+    int get_shader() {
+        return shader;
     }
-    
+
 private:
-	std::string vertex_shader_source;
-    int vertex_shader;
-    int success_vertex;
-    char info_log_vertex[512];
+    std::string shader_source;
+    int shader;
+    int success_fragment;
+    char info_log_fragment[512];
+    int shader_type;
 };
 
 class Shader_program {
 public:
-    
     void create_program() {
-		shader_program = glCreateProgram();
-	}
+        shader_program = glCreateProgram();
+    }
 
     void attach_shader(int shader) {
         glAttachShader(shader_program, shader);
@@ -119,7 +85,6 @@ public:
 
     void link_program() {
         glLinkProgram(shader_program);
-
         glGetProgramiv(shader_program, GL_LINK_STATUS, &success_program);
 
         if (!success_program) {
@@ -128,11 +93,10 @@ public:
         }
     }
 
-
     int get_shader_program() {
         return shader_program;
     }
-    
+
 private:
     int shader_program;
     int success_program;
@@ -185,7 +149,7 @@ public:
     //a-z A-z 0-9
     void close_current_window(char key) {
         if (glfwGetKey(current_window, (int)key) == GLFW_PRESS)
-          glfwSetWindowShouldClose(current_window, true);
+            glfwSetWindowShouldClose(current_window, true);
     }
 
     GLFWwindow* get_current_window() {
@@ -196,51 +160,97 @@ private:
     GLFWwindow* current_window;
 };
 
+class Figure {
+public:
+    Figure(char external_type_name[], std::vector< float> external_vertices) 
+        : type_name{ external_type_name }, vertices { external_vertices }
+    {
+
+    }
+
+    void set_buffers() {
+        glGenBuffers(1, &VBO);
+        glBindBuffer(GL_ARRAY_BUFFER, VBO);
+
+        glBufferData(GL_ARRAY_BUFFER, get_size(), get_vertices(), GL_STATIC_DRAW);
+
+        glGenVertexArrays(1, &VAO);
+        glBindVertexArray(VAO);
+
+        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(float) * 6, (void*)0);
+        glEnableVertexAttribArray(0);
+
+        glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(float) * 6, (void*)(sizeof(float) * 3));
+        glEnableVertexAttribArray(1);
+    }
+
+    void draw_figure() {
+        glBindVertexArray(VAO);
+
+        if (type_name == "TRIANGLE") {
+            glDrawArrays(GL_TRIANGLES, 0, 3);
+        }
+        else if (type_name == "RECTANGLE") {
+            glDrawArrays(GL_TRIANGLES, 0, 3);
+            glDrawArrays(GL_TRIANGLES, 1, 3);
+        }
+    }
+
+    float* get_vertices() {
+        return &vertices[0];
+    }
+
+    int get_size() {
+        return vertices.size() * sizeof(vertices[0]);
+    }
+
+private:
+    std::vector< float> vertices;
+    char *type_name;
+    unsigned int VBO, VAO;
+};
 
 int main()
 {
     GLInit *init = new GLInit;
-    Vertex_shader *vertex_shader = new Vertex_shader;
-    Fragment_shader *fragment_shader = new Fragment_shader;
+    Shader *vertex_shader = new Shader(GL_VERTEX_SHADER);
+    Shader *fragment_shader = new Shader(GL_FRAGMENT_SHADER);
     Shader_program *shader_program = new Shader_program;
 
     init->start();
     init->set_version(4, 0);
     init->set_profile();
-    init->make_new_window(800, 600, "sooqa");
+    init->make_new_window(800, 600, "test");
 
     vertex_shader->set_shader_source("vertex.vs");
     vertex_shader->compile_shader();
-    
+
     fragment_shader->set_shader_source("fragment.fs");
     fragment_shader->compile_shader();
 
     shader_program->create_program();
-    shader_program->attach_shader(vertex_shader->get_vertex_shader());
-    shader_program->attach_shader(fragment_shader->get_fragment_shader());
+    shader_program->attach_shader(vertex_shader->get_shader());
+    shader_program->attach_shader(fragment_shader->get_shader());
     shader_program->link_program();
-    
-    float vertices[] = {
-        -0.3f, -0.9f, 0.0f, 1.0f, 0.0f, 0.0f,
-        0.5f, -0.2f, 0.0f, 0.0f, 1.0f, 0.0f,
-        0.0f,  0.3f, 0.0f, 0.0f, 0.0f, 1.0f
+
+    std::vector< float> vertices_rectangle = {
+        0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f,
+        0.0f, 0.3f, 0.0f, 0.0f, 1.0f, 0.0f,
+        0.5f,  0.0f, 0.0f, 0.0f, 0.0f, 1.0f,
+        0.5f,  0.3f, 0.0f, 1.0f, 0.0f, 1.0f,
     };
 
+    std::vector< float> vertices_triangle = {
+        0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f,
+        0.0f, -0.3f, 0.0f, 0.0f, 1.0f, 0.0f,
+        -0.5f,  0.0f, 0.0f, 0.0f, 0.0f, 1.0f,
+    };
 
-    unsigned int VBO, VAO;
-    glGenBuffers(1, &VBO);
-    glBindBuffer(GL_ARRAY_BUFFER, VBO);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+    Figure *triangle = new Figure("TRIANGLE", vertices_triangle);
+    Figure *rectangle = new Figure("RECTANGLE", vertices_rectangle);
 
-    glGenVertexArrays(1, &VAO);
-    glBindVertexArray(VAO);
-
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(float) * 6, (void*)0);
-    glEnableVertexAttribArray(0);
-
-    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(float) * 6, (void*)(sizeof(float) * 3))  ;
-    glEnableVertexAttribArray(1);
-
+    triangle->set_buffers();
+    rectangle->set_buffers();
 
     while (!glfwWindowShouldClose(init->get_current_window())) {
         init->close_current_window('F');
@@ -249,8 +259,9 @@ int main()
         glClear(GL_COLOR_BUFFER_BIT);
 
         glUseProgram(shader_program->get_shader_program());
-        glBindVertexArray(VAO);
-        glDrawArrays(GL_TRIANGLES, 0, 3);
+
+        triangle->draw_figure();
+        rectangle->draw_figure();
 
         glfwSwapBuffers(init->get_current_window());
         glfwPollEvents();
